@@ -171,7 +171,7 @@ def main() :
 
   it_axis = np.arange(0,it_num)
 
-  fig,ax = plt.subplots(1,1,figsize=(4,3),dpi=300) 
+  fig,ax = plt.subplots(1,1,figsize=(3,3*3/4),dpi=300) 
   ax.set_xlim(0,5)
   ax.set_ylim(0,0.55)
   ax.set_yticks([0, 0.5])
@@ -184,20 +184,20 @@ def main() :
   ax.legend(loc="upper right")  
   plt.savefig("RMSVE.png")
 
-  fig,ax = plt.subplots(1,1,figsize=(4,3),dpi=300) 
+  fig,ax = plt.subplots(1,1,figsize=(3,3*3/4),dpi=300) 
   ax.set_xlim(0,5)
   ax.set_ylim(0,0.55)
   ax.set_yticks([0, 0.5])
   ax.set_xticks([0,1, 5])
   ax.set_xlabel("iteration",labelpad = -10)
-  ax.set_ylabel("$||pi_n-pi^*||_{\infty}$",labelpad = -12)  
+  ax.set_ylabel("$||\\pi_n-\\pi^*||_{\infty}$",labelpad = -12)  
   ax.plot(it_axis, supnorm(ex0.res.pi,ex0.opt.pi),"ro-",label="$\\alpha = 1.0$")
   ax.plot(it_axis, supnorm(ex1.res.pi,ex1.opt.pi),"go-",label="$\\alpha = 0.9$")
   ax.plot(it_axis, supnorm(ex2.res.pi,ex2.opt.pi),"bo-",label="$\\alpha = 0.6$")  
   ax.legend(loc="center right")
   plt.savefig("supdist.png")
 
-  fig,ax = plt.subplots(1,1,figsize=(4,3),dpi=300) 
+  fig,ax = plt.subplots(1,1,figsize=(3,3*3/4),dpi=300) 
   ax.set_xlim(0,5)
   ax.set_ylim(0.5,0.61)
   ax.set_yticks([0.5, 0.6])
