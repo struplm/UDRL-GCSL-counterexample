@@ -3,6 +3,7 @@
 
 
 import numpy as np
+import matplotlib.pyplot as plt
 
 
 class Container() :
@@ -17,16 +18,17 @@ def get_CE(alpha) :
                 (transitions are independent on actions) 
   """
   CE = Container()
+  CE.alpha = alpha
   CE.A = 2 # number of orig MDP actions (the same for CE)
   CE.S = 2 # number of orig MDP states
-  CE.G = S # number of goals
+  CE.G = CE.S # number of goals
   CE.N = 1 # max rem. horizon
   CE.h0 = 1 # initial rem. horizon (fixed horizon problem -- initial horizon distribution is a singleton)
-  CE.s0 = 0 # initial state
-  CE.pg0 = np.ones([CE.G]) # initial goal distribution
+  CE.s0 = 0 # initial state (initial orig. MDP state distribution is a singleton)
+  CE.pg0 = np.ones([CE.G]) # initial goal distribution is uniform
   CE.pg0 = CE.pg0 / np.sum(CE.pg0)
   # orig. MDP transition matrix
-  CE.P = np.array([[alpha,1-alpha],[1-alpha,alpha]) # SxA transition matrix, indexed by next state and current action (s_{t+1}, a_t)
+  CE.P = np.array([[alpha,1-alpha],[1-alpha,alpha]]) # SxA transition matrix, indexed by next state and current action (s_{t+1}, a_t)
                                                     # the current state is always 0 (s_t = 0)
   CE.rho = np.array([0,1]) # identity map rho:S -> G(=S)
   return CE 
@@ -45,7 +47,7 @@ def get_opt(CE) :
   pi = np.zeros([A,G]) # action x "current state CE goal component"
   for g in range(G) :
     for a in range(A) :
-      Q[g,a] = P[g,a]
+      Q[g,a] = CE.P[g,a]
     
     pi[:,g] = Q[g,:] == np.max(Q[g,:])
     pi[:,g] = pi[:,g]/np.sum(pi[:,g])
@@ -68,39 +70,45 @@ def get_policy_values(CE,pi) :
   Q = np.zeros([G,A]) # "current state CE goal component" x action
   V = np.zeros([G])   # "current state CE goal component"
   for g in range(G) :
-    for a in range(A) :
-      Q[g,a] = P[g,a]
+    for a in range(A) : 
+      Q[g,a] = CE.P[g,a]
     V[g] = np.inner(Q[g,:],pi[:,g])
   J = np.inner(CE.pg0,V) # GCSL objective
   return Q,V,J
 
 
+def sample(dist) :
+  return np.random.choice(len(dist),p=dist) # a sample from cathegirical dist
 
-def simulate_CE(traj_num,CE,pi)
+
+def simulate_CE(traj_num,CE,pi) :
   """
-  returns batch of traj_num rajectories of the environment
+  returns batch of traj_num rajectories of the CE
   """
-  batch = np.zeros([traj_num,2,3+1]) #traj_num x l(\tau) +1 x (num of CE components + 1)
-  for traj_idx in range(raj_num) :
+  batch = np.zeros([traj_num,2,3+1],dtype=np.int) #traj_num x l(\tau) +1 x (num of CE components + 1)
+  for traj_idx in range(traj_num) :
     # samle the initial CE stae
     s = CE.s0 #0
     h = CE.h0 #1
-    g = sample(CE.pg)
-    a = sample(pi[:,g])
-    batch[traj_idx,0]=[s,h,g,a]
-    s_ = sample(CE.P[:,a])
+    g = sample(CE.pg0) # sample CE initial state goal component
+    a = sample(pi[:,g]) # sample first action    
+    batch[traj_idx,0]=[s,h,g,a] 
+    s_ = sample(CE.P[:,a]) # sample the second (and final) CE original MDP state component
     h_ = h-1
     g_ = g
-    batch[traj_idx,1]=[s_,h_,g_,np.nan]
+    batch[traj_idx,1]=[s_,h_,g_,-1]
   return batch
   
 def UDRL(CE,pi0,it_num) :
   """
   Simulates it_num iterations of UDRL algorithm
   """
+  G = CE.G
+  A = CE.A
   V = np.zeros([it_num,G]) # it_num x current state CE goal component
   J = np.zeros([it_num]) # it_num
   pi = np.zeros([it_num,A,G]) # it_num x action x current state CE goal component
+  traj_num = 10000 # number of trajectores to be simulated in each UDRL iteration
   
   pi[0] = pi0
   _,V[0],J[0] = get_policy_values(CE,pi0)
@@ -114,25 +122,96 @@ def UDRL(CE,pi0,it_num) :
     for sigma in batch :
       s0,h0,g0,a0 = sigma[0]
       s1,h1,g1,_  = sigma[1]
+      #print(f"s1={s1}")
       fit[a0,CE.rho[s1]] = fit[a0,CE.rho[s1]] +1
     fit[:,0] = fit[:,0]/np.sum(fit[:,0])
     fit[:,1] = fit[:,1]/np.sum(fit[:,1])
     pi[n] = fit
     _,V[n],J[n] = get_policy_values(CE,pi[n])
-  return V,J,pi
+    res = Container()
+    res.V = V
+    res.J = J
+    res.pi = pi
+  return res
+
+
+def RMSVE(V1,V2) :
+  return np.sqrt(np.mean(np.square(V1-V2),axis=1))
+
+def supnorm(pi1,pi2) :
+  return np.max(np.abs(pi1-pi2),axis=(1,2))
 
 def main() :
-  it_num = 20
-  CE = get_CE(alpha = 0.6)
-  pi0 = np.ones([CE.A,CE.G])/CE.A # uniform initial policy 
-  V,J,_ = UDRL(CE,pi0,it_num)
-  opt = get_opt(CE)
+  it_num = 6
+  
+  ex0 = Container() # Experiment 0
+  ex0.CE = get_CE(alpha = 1.0) # deterministic case
+  A,G = ex0.CE.A,ex0.CE.G
+  pi0 = np.ones([A,G])/A # uniform initial policy 
+  ex0.res = UDRL(ex0.CE,pi0,it_num)
+  ex0.opt = get_opt(ex0.CE)
+
+  ex1 = Container() # Experiment 1
+  ex1.CE = get_CE(alpha = 0.9)
+  ex1.res = UDRL(ex1.CE,pi0,it_num)
+  ex1.opt = get_opt(ex1.CE)
+
+  ex2 = Container() # Experiment 2
+  ex2.CE = get_CE(alpha = 0.6) # heavy stochasticity
+  ex2.res = UDRL(ex2.CE,pi0,it_num)
+  ex2.opt = get_opt(ex2.CE)
+  #print(f"ex2.pi={ex2.pi}")
+
+
+  ex3 = Container() # Experiment 3 -- is there a monotony in GCSL J objective? 
+  ex3.CE = get_CE(alpha = 0.6) # heavy stochasticity
+  ex3.opt = get_opt(ex3.CE)
+  pi0 = ex3.opt.pi # optimum initial condition
+  ex3.res = UDRL(ex3.CE,pi0,it_num)  
 
   it_axis = np.arange(0,it_num)
-  plt.figure()
-  plt.plot(it_axis, RMSVE(V,opt.V))
-  plt.show()
-  
-    
+
+  fig,ax = plt.subplots(1,1,figsize=(4,3),dpi=300) 
+  ax.set_xlim(0,5)
+  ax.set_ylim(0,0.55)
+  ax.set_yticks([0, 0.5])
+  ax.set_xticks([0,1, 5])
+  ax.set_xlabel("iteration",labelpad = -10)
+  ax.set_ylabel("RMSVE",labelpad = -12)  
+  ax.plot(it_axis, RMSVE(ex0.res.V,ex0.opt.V),"ro-",label="$\\alpha = 1.0$")
+  ax.plot(it_axis, RMSVE(ex1.res.V,ex1.opt.V),"go-",label="$\\alpha = 0.9$")
+  ax.plot(it_axis, RMSVE(ex2.res.V,ex2.opt.V),"bo-",label="$\\alpha = 0.6$")  
+  ax.legend(loc="upper right")  
+  plt.savefig("RMSVE.png")
+
+  fig,ax = plt.subplots(1,1,figsize=(4,3),dpi=300) 
+  ax.set_xlim(0,5)
+  ax.set_ylim(0,0.55)
+  ax.set_yticks([0, 0.5])
+  ax.set_xticks([0,1, 5])
+  ax.set_xlabel("iteration",labelpad = -10)
+  ax.set_ylabel("$||pi_n-pi^*||_{\infty}$",labelpad = -12)  
+  ax.plot(it_axis, supnorm(ex0.res.pi,ex0.opt.pi),"ro-",label="$\\alpha = 1.0$")
+  ax.plot(it_axis, supnorm(ex1.res.pi,ex1.opt.pi),"go-",label="$\\alpha = 0.9$")
+  ax.plot(it_axis, supnorm(ex2.res.pi,ex2.opt.pi),"bo-",label="$\\alpha = 0.6$")  
+  ax.legend(loc="center right")
+  plt.savefig("supdist.png")
+
+  fig,ax = plt.subplots(1,1,figsize=(4,3),dpi=300) 
+  ax.set_xlim(0,5)
+  ax.set_ylim(0.5,0.61)
+  ax.set_yticks([0.5, 0.6])
+  ax.set_xticks([0,1, 5])
+  ax.set_xlabel("iteration",labelpad = -10)
+  ax.set_ylabel("$J(\pi_n)$",labelpad = -12)  
+  ax.plot([ it_axis[0],it_axis[-1] ], ex3.opt.J*np.ones([2]),"b--",label="$J(\pi^*)$")
+  ax.plot(it_axis, ex3.res.J,"ro-",label="$\pi_0 = \pi^*$")  
+  ax.plot(it_axis, ex2.res.J,"go-",label="$\pi_0$ is uniform")
+  ax.legend(loc="center right")
+  plt.savefig("monotony.png")
+
+
+if __name__ == '__main__':
+  main()
 
 
