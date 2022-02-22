@@ -1,5 +1,6 @@
 # UDRL-GCSL-counterexample
-# Command Extension used in counterexample 
+# Used CE (see get_CE() def. for details) posses just two transient states differing just in goal component (s=0,h=1,g=0) and (s=0,h=1,g=1)
+# thus values and policies are parametrized just by CE goal component, s=0,h=1 is assumed implicitely
 
 
 import numpy as np
@@ -15,7 +16,7 @@ def get_CE(alpha) :
   alpha - parameter determining stochasticity of orig MDP, posible values are in (0.5,1]
           1 - deterministic environment
           0.5 - uniform transition distribution the most stochastic version of the environment
-                (transitions are independent on actions) 
+                (transitions are independent on actions)                 
   """
   CE = Container()
   CE.alpha = alpha
@@ -28,8 +29,9 @@ def get_CE(alpha) :
   CE.pg0 = np.ones([CE.G]) # initial goal distribution is uniform
   CE.pg0 = CE.pg0 / np.sum(CE.pg0)
   # orig. MDP transition matrix
-  CE.P = np.array([[alpha,1-alpha],[1-alpha,alpha]]) # SxA transition matrix, indexed by next state and current action (s_{t+1}, a_t)
-                                                    # the current state is always 0 (s_t = 0)
+  CE.P = np.array([[alpha,1-alpha],[1-alpha,alpha]]) # orig. MDP transition kernel from state 0
+                                                     # SxA matrix, indexed by next state and current action (s_{t+1}, a_t)
+                                                     # the current state is always 0 (s_t = 0)
   CE.rho = np.array([0,1]) # identity map rho:S -> G(=S)
   return CE 
 
@@ -73,12 +75,12 @@ def get_policy_values(CE,pi) :
     for a in range(A) : 
       Q[g,a] = CE.P[g,a]
     V[g] = np.inner(Q[g,:],pi[:,g])
-  J = np.inner(CE.pg0,V) # GCSL objective
+  J = np.inner(CE.pg0,V) # GCSL objective goal reaching objective
   return Q,V,J
 
 
-def sample(dist) :
-  return np.random.choice(len(dist),p=dist) # a sample from cathegirical dist
+def sample(dist) : # a sample from cathegorical dist
+  return np.random.choice(len(dist),p=dist) 
 
 
 def simulate_CE(traj_num,CE,pi) :
@@ -88,15 +90,15 @@ def simulate_CE(traj_num,CE,pi) :
   batch = np.zeros([traj_num,2,3+1],dtype=np.int) #traj_num x l(\tau) +1 x (num of CE components + 1)
   for traj_idx in range(traj_num) :
     # samle the initial CE stae
-    s = CE.s0 #0
-    h = CE.h0 #1
-    g = sample(CE.pg0) # sample CE initial state goal component
-    a = sample(pi[:,g]) # sample first action    
-    batch[traj_idx,0]=[s,h,g,a] 
-    s_ = sample(CE.P[:,a]) # sample the second (and final) CE original MDP state component
-    h_ = h-1
-    g_ = g
-    batch[traj_idx,1]=[s_,h_,g_,-1]
+    s0 = CE.s0 #0
+    h0 = CE.h0 #1
+    g0 = sample(CE.pg0) # sample CE initial state goal component
+    a0 = sample(pi[:,g0]) # sample first action    
+    batch[traj_idx,0]=[s0,h0,g0,a0] 
+    s1 = sample(CE.P[:,a0]) # sample the second (and final) CE original MDP state component
+    h1 = h0-1
+    g1 = g0
+    batch[traj_idx,1]=[s1,h1,g1,-1]
   return batch
   
 def UDRL(CE,pi0,it_num) :
@@ -121,8 +123,7 @@ def UDRL(CE,pi0,it_num) :
     fit = np.zeros([A,G])
     for sigma in batch :
       s0,h0,g0,a0 = sigma[0]
-      s1,h1,g1,_  = sigma[1]
-      #print(f"s1={s1}")
+      s1,h1,g1,_  = sigma[1]      
       fit[a0,CE.rho[s1]] = fit[a0,CE.rho[s1]] +1
     fit[:,0] = fit[:,0]/np.sum(fit[:,0])
     fit[:,1] = fit[:,1]/np.sum(fit[:,1])
@@ -163,7 +164,7 @@ def main() :
   #print(f"ex2.pi={ex2.pi}")
 
 
-  ex3 = Container() # Experiment 3 -- is there a monotony in GCSL J objective? 
+  ex3 = Container() # Experiment 3 -- is there a monotony in GCSL goal reaching objective J? 
   ex3.CE = get_CE(alpha = 0.6) # heavy stochasticity
   ex3.opt = get_opt(ex3.CE)
   pi0 = ex3.opt.pi # optimum initial condition
@@ -197,15 +198,15 @@ def main() :
   ax.legend(loc="center right")
   plt.savefig("supdist.png")
 
-  fig,ax = plt.subplots(1,1,figsize=(3,3*3/4),dpi=300) 
+  fig,ax = plt.subplots(1,1,figsize=(3,3*3/4),dpi=300)
   ax.set_xlim(0,5)
   ax.set_ylim(0.5,0.61)
   ax.set_yticks([0.5, 0.6])
   ax.set_xticks([0,1, 5])
   ax.set_xlabel("iteration",labelpad = -10)
-  ax.set_ylabel("$J(\pi_n)$",labelpad = -12)  
+  ax.set_ylabel("$J(\pi_n)$",labelpad = -12)
   ax.plot([ it_axis[0],it_axis[-1] ], ex3.opt.J*np.ones([2]),"b--",label="$J(\pi^*)$")
-  ax.plot(it_axis, ex3.res.J,"ro-",label="$\pi_0 = \pi^*$")  
+  ax.plot(it_axis, ex3.res.J,"ro-",label="$\pi_0 = \pi^*$")
   ax.plot(it_axis, ex2.res.J,"go-",label="$\pi_0$ is uniform")
   ax.legend(loc="center right")
   plt.savefig("monotony.png")
