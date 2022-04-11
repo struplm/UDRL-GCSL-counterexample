@@ -5,6 +5,7 @@
 
 import numpy as np
 import matplotlib.pyplot as plt
+import seaborn as sns
 
 
 class Container() :
@@ -87,7 +88,7 @@ def simulate_CE(traj_num,CE,pi) :
   """
   returns batch of traj_num rajectories of the CE
   """
-  batch = np.zeros([traj_num,2,3+1],dtype=np.int) #traj_num x l(\tau) +1 x (num of CE components + 1)
+  batch = np.zeros([traj_num,2,3+1],dtype=np.int64) #traj_num x l(\tau) +1 x (num of CE components + 1)
   for traj_idx in range(traj_num) :
     # samle the initial CE stae
     s0 = CE.s0 #0
@@ -172,6 +173,8 @@ def main() :
 
   it_axis = np.arange(0,it_num)
 
+  colors = sns.color_palette("colorblind", 3)
+
   fig,ax = plt.subplots(1,1,figsize=(3,3*3/4),dpi=300) 
   ax.set_xlim(0,5)
   ax.set_ylim(0,0.55)
@@ -179,9 +182,9 @@ def main() :
   ax.set_xticks([0,1, 5])
   ax.set_xlabel("iteration",labelpad = -10)
   ax.set_ylabel("RMSVE",labelpad = -12)  
-  ax.plot(it_axis, RMSVE(ex0.res.V,ex0.opt.V),"ro-",label="$\\alpha = 1.0$")
-  ax.plot(it_axis, RMSVE(ex1.res.V,ex1.opt.V),"go-",label="$\\alpha = 0.9$")
-  ax.plot(it_axis, RMSVE(ex2.res.V,ex2.opt.V),"bo-",label="$\\alpha = 0.6$")  
+  ax.plot(it_axis, RMSVE(ex0.res.V,ex0.opt.V),"o-",label="$\\alpha = 1.0$",color=colors[1])  
+  ax.plot(it_axis, RMSVE(ex1.res.V,ex1.opt.V),"o-",label="$\\alpha = 0.9$",color=colors[2])
+  ax.plot(it_axis, RMSVE(ex2.res.V,ex2.opt.V),"o-",label="$\\alpha = 0.6$",color=colors[0])  
   ax.legend(loc="upper right")  
   plt.savefig("RMSVE.png")
 
@@ -192,9 +195,9 @@ def main() :
   ax.set_xticks([0,1, 5])
   ax.set_xlabel("iteration",labelpad = -10)
   ax.set_ylabel("$||\\pi_n-\\pi^*||_{\infty}$",labelpad = -12)  
-  ax.plot(it_axis, supnorm(ex0.res.pi,ex0.opt.pi),"ro-",label="$\\alpha = 1.0$")
-  ax.plot(it_axis, supnorm(ex1.res.pi,ex1.opt.pi),"go-",label="$\\alpha = 0.9$")
-  ax.plot(it_axis, supnorm(ex2.res.pi,ex2.opt.pi),"bo-",label="$\\alpha = 0.6$")  
+  ax.plot(it_axis, supnorm(ex0.res.pi,ex0.opt.pi),"o-",label="$\\alpha = 1.0$",color=colors[1])
+  ax.plot(it_axis, supnorm(ex1.res.pi,ex1.opt.pi),"o-",label="$\\alpha = 0.9$",color=colors[2])
+  ax.plot(it_axis, supnorm(ex2.res.pi,ex2.opt.pi),"o-",label="$\\alpha = 0.6$",color=colors[0])  
   ax.legend(loc="center right")
   plt.savefig("supdist.png")
 
@@ -205,9 +208,9 @@ def main() :
   ax.set_xticks([0,1, 5])
   ax.set_xlabel("iteration",labelpad = -10)
   ax.set_ylabel("$J(\pi_n)$",labelpad = -12)
-  ax.plot([ it_axis[0],it_axis[-1] ], ex3.opt.J*np.ones([2]),"b--",label="$J(\pi^*)$")
-  ax.plot(it_axis, ex3.res.J,"ro-",label="$\pi_0 = \pi^*$")
-  ax.plot(it_axis, ex2.res.J,"go-",label="$\pi_0$ is uniform")
+  ax.plot([ it_axis[0],it_axis[-1] ], ex3.opt.J*np.ones([2]),"--",label="$J(\pi^*)$",color=colors[0])
+  ax.plot(it_axis, ex3.res.J,"o-",label="$\pi_0 = \pi^*$",color=colors[1])
+  ax.plot(it_axis, ex2.res.J,"o-",label="$\pi_0$ is uniform",color=colors[2])
   ax.legend(loc="center right")
   plt.savefig("monotony.png")
 
